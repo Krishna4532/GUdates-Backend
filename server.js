@@ -3,85 +3,110 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import http from "http";
+import { Server } from "socket.io";
 
-// Auth Routes
 import authRoutes from "./routes/authRoutes.js";
-
-// User Routes (profile, update, posts, profile completion)
 import userRoutes from "./routes/user.js";
 
 dotenv.config();
 const app = express();
+const server = http.createServer(app);
 
-/* ---------------------------------------------------
-   CORS CONFIG – REQUIRED FOR NETLIFY FRONTEND
-----------------------------------------------------*/
+/* -------------------- SOCKET.IO SETUP -------------------- */
+const io = new Server(server, {
+  cors: {
+    origin: ["https://gudates.netlify.app", "http://localhost:5500"],
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
 
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "https://gudates.netlify.app";
+// Store active users
+let onlineUsers = new Map();
 
+io.on("connection", (socket) => {
+  console.log("🔥 User connected:", socket.id);
+
+  // User joins the site
+  socket.on("registerUser", (userId) => {
+    onlineUsers.set(userId, socket.id);
+    console.log("Online Users:", onlineUsers);
+  });
+
+  /* -------------------- REAL-TIME CHAT -------------------- */
+  socket.on("sendMessage", (data) => {
+    const receiverSocket = onlineUsers.get(data.receiver);
+    if (receiverSocket) {
+      io.to(receiverSocket).emit("receiveMessage", data);
+    }
+  });
+
+  /* -------------------- VIDEO CALL SIGNALING -------------------- */
+  // Join a video call room
+  socket.on("joinRoom", ({ roomId }) => {
+    socket.join(roomId);
+    socket.to(roomId).emit("userJoined", socket.id);
+  });
+
+  socket.on("offer", (data) => {
+    socket.to(data.roomId).emit("offer", data);
+  });
+
+  socket.on("answer", (data) => {
+    socket.to(data.roomId).emit("answer", data);
+  });
+
+  socket.on("candidate", (data) => {
+    socket.to(data.roomId).emit("candidate", data);
+  });
+
+  /* -------------------- DISCONNECT -------------------- */
+  socket.on("disconnect", () => {
+    console.log("❌ User disconnected:", socket.id);
+    for (let [userId, sock] of onlineUsers.entries()) {
+      if (sock === socket.id) {
+        onlineUsers.delete(userId);
+      }
+    }
+  });
+});
+
+/* -------------------- MIDDLEWARE -------------------- */
 app.use(
   cors({
-    origin: CLIENT_ORIGIN,
+    origin: "https://gudates.netlify.app",
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true, // Allows cookies & tokens to travel
+    credentials: true,
   })
 );
 
-/* ---------------------------------------------------
-   GLOBAL MIDDLEWARE
-----------------------------------------------------*/
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 app.use(cookieParser());
 
-/* ---------------------------------------------------
-   SERVER STATUS TEST ROUTE
-----------------------------------------------------*/
+/* -------------------- ROUTES -------------------- */
 app.get("/", (req, res) => {
-  res.send("💖 GUdates backend is running successfully!");
+  res.send("💖 GUdates backend is running!");
 });
 
-/* ---------------------------------------------------
-   MAIN ROUTES
-----------------------------------------------------*/
-
-// Authentication (Signup, Login, Logout)
 app.use("/api/auth", authRoutes);
-
-// User operations (Profile setup, get profile, update profile, upload posts, etc.)
 app.use("/api/user", userRoutes);
 
-/* ---------------------------------------------------
-   OPTIONAL GLOBAL ERROR HANDLER
-----------------------------------------------------*/
-app.use((err, req, res, next) => {
-  console.error("🔥 SERVER ERROR:", err.stack);
-  res.status(500).json({
-    message: "Internal Server Error",
-    error: err.message,
-  });
-});
-
-/* ---------------------------------------------------
-   DATABASE CONNECT
-----------------------------------------------------*/
+/* -------------------- DB -------------------- */
 mongoose
-  .connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
+  .connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB connected"))
-  .catch((err) => console.error("❌ MongoDB Error:", err.message));
+  .catch((err) => console.log(err));
 
-/* ---------------------------------------------------
-   SERVER START
-----------------------------------------------------*/
+/* -------------------- START SERVER -------------------- */
 const PORT = process.env.PORT || 5000;
+server.listen(PORT, () =>
+  console.log(`🚀 Server running at http://localhost:${PORT}`)
+);
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running at http://localhost:${PORT}`);
-});
+
 
 
 
