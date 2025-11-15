@@ -3,76 +3,116 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import authRoutes from "./routes/authRoutes.js";
+import userRoutes from "./routes/user.js";
 import http from "http";
 import { Server } from "socket.io";
 
-import authRoutes from "./routes/authRoutes.js";
-import userRoutes from "./routes/user.js";
-import chatRoutes from "./routes/chat.js";
-
 dotenv.config();
+
 const app = express();
 
-/* ---------- SOCKET.IO SERVER WRAPPER ---------- */
+/* ---------------- CORS ---------------- */
+const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "https://gudates.netlify.app";
+
+app.use(
+  cors({
+    origin: CLIENT_ORIGIN,
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+
+/* ---------------- ROUTES ---------------- */
+app.get("/", (req, res) => {
+  res.send("💖 GUdates backend with Random Videochat running!");
+});
+
+app.use("/api/auth", authRoutes);
+app.use("/api/user", userRoutes);
+
+/* ---------------- SOCKET.IO SERVER ---------------- */
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_ORIGIN || "https://gudates.netlify.app",
+    origin: CLIENT_ORIGIN,
     methods: ["GET", "POST"],
     credentials: true
   }
 });
 
-/* ---------- SOCKET.IO EVENTS ---------- */
-io.on("connection", (socket) => {
-  console.log("🟢 User connected:", socket.id);
+/* ---------------- RANDOM VIDEOCHAT MATCH SYSTEM ---------------- */
 
-  socket.on("joinRoom", (room) => {
-    socket.join(room);
+let waitingUser = null; // store a user waiting for a partner
+
+io.on("connection", (socket) => {
+  console.log("User connected:", socket.id);
+
+  // User wants a partner
+  socket.on("find-partner", () => {
+    if (waitingUser === null) {
+      // No one waiting → store this person
+      waitingUser = socket;
+      socket.emit("waiting");
+    } else {
+      // Match two users
+      const partner = waitingUser;
+      waitingUser = null;
+
+      socket.emit("partner-found", { partnerId: partner.id });
+      partner.emit("partner-found", { partnerId: socket.id });
+    }
   });
 
-  socket.on("sendMessage", (data) => {
-    io.to(data.room).emit("receiveMessage", data);
+  // Relay WebRTC offer
+  socket.on("offer", (data) => {
+    io.to(data.partnerId).emit("offer", {
+      offer: data.offer,
+      sender: socket.id,
+    });
+  });
+
+  // Relay WebRTC answer
+  socket.on("answer", (data) => {
+    io.to(data.partnerId).emit("answer", {
+      answer: data.answer,
+      sender: socket.id,
+    });
+  });
+
+  // Relay ICE candidates
+  socket.on("ice-candidate", (data) => {
+    io.to(data.partnerId).emit("ice-candidate", {
+      candidate: data.candidate,
+      sender: socket.id,
+    });
   });
 
   socket.on("disconnect", () => {
-    console.log("🔴 User disconnected:", socket.id);
+    if (waitingUser && waitingUser.id === socket.id) {
+      waitingUser = null;
+    }
   });
 });
 
-/* ---------- EXPRESS MIDDLEWARE ---------- */
-app.use(
-  cors({
-    origin: process.env.CLIENT_ORIGIN || "https://gudates.netlify.app",
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true
-  })
-);
-
-app.use(express.json({ limit: "10kb" }));
-app.use(express.urlencoded({ extended: true, limit: "10kb" }));
-app.use(cookieParser());
-
-/* ---------- ROUTES ---------- */
-app.get("/", (req, res) => res.send("💖 GUdates backend with Chat system active!"));
-app.use("/api/auth", authRoutes);
-app.use("/api/user", userRoutes);
-app.use("/api/chat", chatRoutes);
-
-/* ---------- DATABASE ---------- */
+/* ---------------- DATABASE ---------------- */
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB connected"))
-  .catch((err) => console.error("❌ MongoDB Error:", err.message));
+  .catch((err) => console.log("❌ MongoDB Error:", err.message));
 
-/* ---------- START SERVER ---------- */
+/* ---------------- START SERVER ---------------- */
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () =>
-  console.log(`🚀 Server & WebSockets running at http://localhost:${PORT}`)
+  console.log(`🚀 Backend running on port ${PORT}`)
 );
 
-export { io };
+
 
 
 
