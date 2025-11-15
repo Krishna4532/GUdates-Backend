@@ -3,16 +3,16 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import authRoutes from "./routes/authRoutes.js"; // Adjust path if needed
-import userRoutes from "./routes/userRoutes.js"; // Assuming you have a user routes file
+import authRoutes from "./routes/authRoutes.js";
+// CRITICAL FIX: Changed the import path to match your file name: user.js
+import userRoutes from "./routes/user.js"; 
 
 dotenv.config();
 const app = express();
 
 /* -------------------- CORS MUST BE FIRST (FIXED) -------------------- */
 
-// CRITICAL FIX: Explicitly allow the Netlify frontend URL.
-// Replace 'https://gudates.netlify.app' with your actual Netlify URL if it's different.
+// Explicitly allow the Netlify frontend URL for complex requests.
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "https://gudates.netlify.app"; 
 
 app.use(
@@ -25,9 +25,9 @@ app.use(
 );
 
 /* -------------------- MIDDLEWARE (BODY PARSERS) -------------------- */
-// CRITICAL FIX: Add limit option to ensure body parsing works for larger payloads (standard practice)
+// Ensures body parsing works and sets a limit
 app.use(express.json({ limit: '10kb' })); 
-app.use(express.urlencoded({ extended: true, limit: '10kb' })); // Good practice to include both
+app.use(express.urlencoded({ extended: true, limit: '10kb' })); 
 app.use(cookieParser());
 
 
@@ -40,11 +40,11 @@ app.get("/", (req, res) => {
 // Primary API route definitions
 app.use("/api/auth", authRoutes);
 
-// Assuming your profile completion route lives under /api/user
+// User profile and data routes
 app.use("/api/user", userRoutes);
 
 
-// Optional: Global Error Handler to ensure JSON responses for unknown errors
+// Optional: Global Error Handler
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({
@@ -68,6 +68,7 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () =>
   console.log(`🚀 Server running at http://localhost:${PORT}`)
 );
+
 
 
 
