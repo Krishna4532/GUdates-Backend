@@ -8,77 +8,45 @@ import { Server } from "socket.io";
 
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/user.js";
+import chatRoutes from "./routes/chat.js";
 
 dotenv.config();
 const app = express();
-const server = http.createServer(app);
 
-/* -------------------- SOCKET.IO SETUP -------------------- */
+/* ---------- SOCKET.IO SERVER WRAPPER ---------- */
+const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: ["https://gudates.netlify.app", "http://localhost:5500"],
+    origin: process.env.CLIENT_ORIGIN || "https://gudates.netlify.app",
     methods: ["GET", "POST"],
     credentials: true
   }
 });
 
-// Store active users
-let onlineUsers = new Map();
-
+/* ---------- SOCKET.IO EVENTS ---------- */
 io.on("connection", (socket) => {
-  console.log("🔥 User connected:", socket.id);
+  console.log("🟢 User connected:", socket.id);
 
-  // User joins the site
-  socket.on("registerUser", (userId) => {
-    onlineUsers.set(userId, socket.id);
-    console.log("Online Users:", onlineUsers);
+  socket.on("joinRoom", (room) => {
+    socket.join(room);
   });
 
-  /* -------------------- REAL-TIME CHAT -------------------- */
   socket.on("sendMessage", (data) => {
-    const receiverSocket = onlineUsers.get(data.receiver);
-    if (receiverSocket) {
-      io.to(receiverSocket).emit("receiveMessage", data);
-    }
+    io.to(data.room).emit("receiveMessage", data);
   });
 
-  /* -------------------- VIDEO CALL SIGNALING -------------------- */
-  // Join a video call room
-  socket.on("joinRoom", ({ roomId }) => {
-    socket.join(roomId);
-    socket.to(roomId).emit("userJoined", socket.id);
-  });
-
-  socket.on("offer", (data) => {
-    socket.to(data.roomId).emit("offer", data);
-  });
-
-  socket.on("answer", (data) => {
-    socket.to(data.roomId).emit("answer", data);
-  });
-
-  socket.on("candidate", (data) => {
-    socket.to(data.roomId).emit("candidate", data);
-  });
-
-  /* -------------------- DISCONNECT -------------------- */
   socket.on("disconnect", () => {
-    console.log("❌ User disconnected:", socket.id);
-    for (let [userId, sock] of onlineUsers.entries()) {
-      if (sock === socket.id) {
-        onlineUsers.delete(userId);
-      }
-    }
+    console.log("🔴 User disconnected:", socket.id);
   });
 });
 
-/* -------------------- MIDDLEWARE -------------------- */
+/* ---------- EXPRESS MIDDLEWARE ---------- */
 app.use(
   cors({
-    origin: "https://gudates.netlify.app",
+    origin: process.env.CLIENT_ORIGIN || "https://gudates.netlify.app",
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
+    credentials: true
   })
 );
 
@@ -86,25 +54,26 @@ app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 app.use(cookieParser());
 
-/* -------------------- ROUTES -------------------- */
-app.get("/", (req, res) => {
-  res.send("💖 GUdates backend is running!");
-});
-
+/* ---------- ROUTES ---------- */
+app.get("/", (req, res) => res.send("💖 GUdates backend with Chat system active!"));
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
+app.use("/api/chat", chatRoutes);
 
-/* -------------------- DB -------------------- */
+/* ---------- DATABASE ---------- */
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB connected"))
-  .catch((err) => console.log(err));
+  .catch((err) => console.error("❌ MongoDB Error:", err.message));
 
-/* -------------------- START SERVER -------------------- */
+/* ---------- START SERVER ---------- */
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () =>
-  console.log(`🚀 Server running at http://localhost:${PORT}`)
+  console.log(`🚀 Server & WebSockets running at http://localhost:${PORT}`)
 );
+
+export { io };
+
 
 
 
