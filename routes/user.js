@@ -1,27 +1,31 @@
-import express from 'express';
-import { protect } from '../middleware/authMiddleware.js'; 
-// NOTE: You will likely need to import your User Mongoose Model here 
-// import User from '../models/User.model.js'; 
+import express from "express";
+import authMiddleware from "../middleware/authMiddleware.js";
+import {
+  completeProfile,
+  getUserProfile,
+  updateProfile,
+  uploadProfilePic,
+  uploadPost,
+  getUserPosts,
+  getAllUsers
+} from "../controllers/userController.js";
 
 const router = express.Router();
 
-// The endpoint for saving the profile data from the frontend
-router.post('/complete-profile', protect, (req, res) => {
-    // ----------------------------------------------------
-    // *** IMPORTANT: REPLACE THIS WITH YOUR MONGOOSE LOGIC ***
-    // This currently just sends a success signal to the frontend
-    // ----------------------------------------------------
-    console.log("Received profile data:", req.body);
-    
-    if (!req.user || !req.user.id) {
-        return res.status(401).json({ success: false, message: "Authentication failed." });
-    }
+router.post("/complete-profile", authMiddleware, completeProfile);
 
-    // Placeholder response to confirm the connection works
-    res.status(200).json({ 
-        success: true, 
-        message: 'Profile saved successfully (Placeholder: Mongoose logic needed)' 
-    });
-});
+router.get("/profile", authMiddleware, getUserProfile);
+
+router.put("/update", authMiddleware, updateProfile);
+
+router.post("/profile-pic", authMiddleware, uploadProfilePic);
+
+router.post("/post", authMiddleware, uploadPost);
+
+router.get("/posts", authMiddleware, getUserPosts);
+
+router.get("/all", authMiddleware, getAllUsers);   // ⭐ THIS RETURNS ALL USERS
 
 export default router;
+
+
