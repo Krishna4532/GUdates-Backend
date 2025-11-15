@@ -1,69 +1,62 @@
-// server.js
 import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import authRoutes from "./routes/authRoutes.js";
+import authRoutes from "./routes/authRoutes.js"; // Adjust path if needed
 
 dotenv.config();
 const app = express();
 
 /* -------------------- CORS MUST BE FIRST -------------------- */
-
-// ** 🛑 CRITICAL FIX: Explicitly define allowed origins for security and functionality **
-const allowedOrigins = [
-    // 1. Your Custom Production Domain
-    'https://gudates.com',
-    // 2. Your Netlify Subdomain (for staging/testing)
-    'https://gudates.netlify.app',
-    // 3. (Optional) Your local development environment
-    // 'http://localhost:5000', // Update if you use a different port locally
-];
-
+// Ensure specific origin is used if not using a catch-all for production
 app.use(
-    cors({
-        // Use a function to check if the origin is in the allowed list
-        origin: (origin, callback) => {
-            // Allow requests with no origin (like mobile apps, postman, or same-origin)
-            if (!origin) return callback(null, true); 
-            
-            if (allowedOrigins.indexOf(origin) !== -1) {
-                callback(null, true); // Origin is allowed
-            } else {
-                callback(new Error('Not allowed by CORS')); // Origin is NOT allowed
-            }
-        },
-        // 🚨 CRUCIAL: Must be true because your frontend uses `credentials: "include"`
-        credentials: true,
-        methods: ["GET", "POST", "PUT", "DELETE"],
-        allowedHeaders: ["Content-Type", "Authorization"]
-    })
+  cors({
+    origin: "*", // allow all for testing
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+  })
 );
 
-/* -------------------- MIDDLEWARE -------------------- */
-app.use(express.json());
+/* -------------------- MIDDLEWARE (BODY PARSERS) -------------------- */
+// CRITICAL FIX: Add limit option to ensure body parsing works for larger payloads (standard practice)
+app.use(express.json({ limit: '10kb' })); 
+app.use(express.urlencoded({ extended: true, limit: '10kb' })); // Good practice to include both
 app.use(cookieParser());
 
+
 /* -------------------- ROUTES -------------------- */
+// Status check route
 app.get("/", (req, res) => {
-    res.send("💖 GUdates backend is running successfully!");
+  res.send("💖 GUdates backend is running successfully!");
 });
 
+// Primary API route definitions
 app.use("/api/auth", authRoutes);
+
+// Optional: Global Error Handler to ensure JSON responses for unknown errors
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({
+        message: 'Internal Server Error',
+        error: err.message
+    });
+});
+
 
 /* -------------------- DATABASE -------------------- */
 mongoose
-    .connect(process.env.MONGO_URI, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-    })
-    .then(() => console.log("✅ MongoDB connected"))
-    .catch((err) => console.error("❌ MongoDB Error:", err.message));
+  .connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => console.log("✅ MongoDB connected"))
+  .catch((err) => console.error("❌ MongoDB Error:", err.message));
 
 /* -------------------- SERVER -------------------- */
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () =>
-    console.log(`🚀 Server running at http://localhost:${PORT}`)
+  console.log(`🚀 Server running at http://localhost:${PORT}`)
 );
+
 
