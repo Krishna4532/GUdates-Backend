@@ -1,11 +1,13 @@
 import mongoose from "mongoose";
 
 const messageSchema = new mongoose.Schema({
-  from: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  to: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  sender: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  receiver: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   text: String,
-  seen: { type: Boolean, default: false },
-  createdAt: { type: Date, default: Date.now }
+  image: String,
+  createdAt: { type: Date, default: Date.now },
+  read: { type: Boolean, default: false }
 });
 
 export default mongoose.model("Message", messageSchema);
+
