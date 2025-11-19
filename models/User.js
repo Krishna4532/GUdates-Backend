@@ -1,41 +1,28 @@
 import mongoose from "mongoose";
-import bcrypt from "bcryptjs";
 
 const userSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  email: { type: String, unique: true, sparse: true },
-  password: { type: String },
-  bio: { type: String, default: "" },
-  course: String,
-  age: Number,
-  heightCm: Number,
-  interests: [String],
-  profilePic: { type: String, default: "" },
-  
-  // NEW: Crucial flag for the frontend flow!
-  profileComplete: { type: Boolean, default: false },
+  username: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
 
-  points: { type: Number, default: 0 },
-  crushPoints: { type: Number, default: 0 },
-  couplePoints: { type: Number, default: 0 }
-  // REMOVED: createdAt is now handled by timestamps
-}, 
-// NEW: Add Mongoose automatic timestamps for 'createdAt' and 'updatedAt'
-{ timestamps: true }); 
+  // Profile fields
+  age: Number,
+  height: Number,
+  interests: [String],
+  course: String,
+  bio: String,
+  avatar: { type: String, default: "" },
 
-/* hash password */
-userSchema.pre("save", async function (next) {
-  if (!this.isModified("password") || !this.password) return next();
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-  next();
-});
+  // Points
+  crushPoints: { type: Number, default: 0 },
+  couplePoints: { type: Number, default: 0 },
+  profilePoints: { type: Number, default: 0 },
 
-userSchema.methods.matchPassword = async function (entered) {
-  return await bcrypt.compare(entered, this.password);
-};
+}, { timestamps: true });
 
 export default mongoose.model("User", userSchema);
+
+
 
 
 
