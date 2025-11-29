@@ -1,15 +1,18 @@
+// models/Message.js
 import mongoose from "mongoose";
 
-const messageSchema = new mongoose.Schema(
-  {
-    sender: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    receiver: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    message: String
-  },
-  { timestamps: true }
-);
+const messageSchema = new mongoose.Schema({
+  sender: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  receiver: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  text: { type: String, default: "" },
+  image: { type: String, default: "" }, // optional cloudinary/url
+  read: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now }
+}, { timestamps: true });
 
 export default mongoose.model("Message", messageSchema);
+
+
 
 
 
